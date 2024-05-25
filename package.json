@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "apollo-server": "^3.13.0",
+    "fs": "^0.0.1-security",
+    "graphql": "^16.8.1",
+    "graphql-upload": "^13.0.0",
+    "prisma": "^5.14.0"
+  }
+}
