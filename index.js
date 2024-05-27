@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
 // Ensure the uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
 const typeDefs = gql`
@@ -23,6 +23,7 @@ const typeDefs = gql`
 
   type Mutation {
     uploadFile(file: Upload!): Image!
+    uploadFiles(files: [Upload!]!): [Image!]!   
   }
 
   type Image {
@@ -35,7 +36,7 @@ const typeDefs = gql`
 `;
 
 const resolvers = {
-  Upload: GraphQLUpload, 
+  Upload: GraphQLUpload,
   Query: {
     images: async () => await prisma.image.findMany(),
   },
@@ -43,12 +44,11 @@ const resolvers = {
     uploadFile: async (parent, { file }) => {
       const { createReadStream, filename, mimetype, encoding } = await file;
       const stream = createReadStream();
-      const filepath = path.join(__dirname, 'uploads', filename);
+      const filepath = path.join(uploadsDir, filename);
       const out = fs.createWriteStream(filepath);
       stream.pipe(out);
       await finished(out);
 
-      
       const image = await prisma.image.create({
         data: {
           filename,
@@ -60,11 +60,37 @@ const resolvers = {
 
       return image;
     },
+    uploadFiles: async (_, { files }) => {
+      const images = [];
+
+      for (const file of files) {
+        const { createReadStream, filename, mimetype, encoding } = await file;
+        const stream = createReadStream();
+        const filepath = path.join(uploadsDir, filename);
+        const out = fs.createWriteStream(filepath);
+        stream.pipe(out);
+        await finished(out);
+
+        const image = await prisma.image.create({
+          data: {
+            filename,
+            mimetype,
+            encoding,
+            path: filepath,
+          },
+        });
+
+        images.push(image);
+      }
+
+      return images;
+    },
   },
 };
 
 const app = express();
-app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 1 })); // 10 MB
+app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 5 })); // 10 MB
+
 const server = new ApolloServer({
   typeDefs,
   resolvers,
